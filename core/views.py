@@ -36,14 +36,23 @@ def home(request):
 
 
 def login_view(request):
+    user_id = request.session.get('user_id')
+    if user_id:
+        return redirect('dashboard') 
+
     message = ""
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
         success, message = auth_service.login(request, username, password)
         if success:
-            return redirect('dashboard')
+            return redirect('dashboard')  # 登入成功導向主頁
     return render(request, 'login.html', {'message': message})
+
+
+def logout_view(request):
+    auth_service.logout(request)
+    return redirect('login')  # 登出後導回首頁登入
 
 
 def dashboard_view(request):

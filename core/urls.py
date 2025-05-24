@@ -5,7 +5,8 @@ from .views import test_result_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', views.dashboard_view, name='dashboard'),
+    path('', views.login_view, name='login'),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('register/', views.register_view, name='register'),
