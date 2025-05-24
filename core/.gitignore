@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+venv/
+
+# SQLite DB
+*.sqlite3
+db.sqlite3
+
+# VSCode
+.vscode/
+
+# 系統垃圾
+.DS_Store
+
+# 環境變數檔案
+.env
