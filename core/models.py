@@ -41,7 +41,7 @@ class Question(models.Model):
 class Favorite(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    note = models.TextField(blank=True)  # 📝 可加筆記（選填）
+    note = models.TextField(blank=True)  # 可加筆記（選填）
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -35,6 +35,17 @@ def home(request):
     return render(request, 'home.html', {'explanation': explanation})
 
 
+def register_view(request):
+    message = ""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        success, message = auth_service.register(username, password)
+        if success:
+            return redirect('login')  # 註冊成功就跳回登入頁
+    return render(request, 'register.html', {'message': message})
+
+
 def login_view(request):
     user_id = request.session.get('user_id')
     if user_id:
@@ -234,17 +245,6 @@ def gpt_detail_view(request):
         'next_index': next_index,
     })
 
-
-
-def register_view(request):
-    message = ""
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        success, message = auth_service.register(username, password)
-        if success:
-            return redirect('login')  # 註冊成功就跳回登入頁
-    return render(request, 'register.html', {'message': message})
 
 
 def logout_view(request):
