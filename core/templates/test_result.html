@@ -1,0 +1,41 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>測驗結果</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-5">
+
+  <h2 class="mb-4">測驗結果</h2>
+
+  <p><strong>你答對了 {{ correct_count }} / {{ total }} 題，正確率為 {{ accuracy }}%</strong></p>
+
+  <hr>
+
+  <h5 class="mt-4">錯題清單</h5>
+  {% if wrong_records %}
+    <ul class="list-group">
+      {% for item in wrong_records %}
+        {% with record=item.record %}
+          <li class="list-group-item">
+            <p><strong>Q{{ item.seq }}.</strong> {{ record.question.content }}</p>
+            <p>你選了: {{ record.selected_option }}. {{ record.question.options|get_item:record.selected_option }}</p>
+            <p>正確答案: {{ record.question.answer }}. {{ record.question.options|get_item:record.question.answer }}</p>
+            <a href="/gpt/?qid={{ record.question.id }}" class="btn btn-sm btn-outline-info">GPT 詳解</a>
+          </li>
+        {% endwith %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">找不到錯題，你很棒！</p>
+  {% endif %}
+
+  <div class="mt-4">
+    <a href="/" class="btn btn-secondary">回首頁</a>
+  </div>
+
+</body>
+</html>

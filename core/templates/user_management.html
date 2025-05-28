@@ -1,0 +1,37 @@
+<h2>使用者與權限管理</h2>
+{% if messages %}
+    <ul style="color: green;">
+        {% for message in messages %}
+            <li>{{ message }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>ID</th>
+        <th>帳號</th>
+        <th>目前角色</th>
+        <th>更改角色</th>
+    </tr>
+    {% for user in users %}
+    <tr>
+        <td>{{ user.id }}</td>
+        <td>{{ user.username }}</td>
+        <td>{{ user.role }}</td>
+        <td>
+            <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ user.id }}">
+                <select name="role">
+                    <option value="student" {% if user.role == 'student' %}selected{% endif %}>學生</option>
+                    <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>管理員</option>
+                </select>
+                <button type="submit">儲存</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<a href="{% url 'dashboard' %}">← 回主選單</a>
