@@ -1,34 +1,16 @@
-# core/views.py 頂部
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse # JsonResponse 也放到這裡
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
-from django.utils import timezone # 為了 WeakTopic 的 last_diagnosed
-from .repositories import UserRepository, WrongQuestionRepository, WeakTopicRepository, TestRecordRepository 
-
-
-from django.db.models import Min, Count, Q 
-from collections import OrderedDict
-
+from .services.gpt_service import GPTExplanationService
+from .services.openai_client import OpenAIClient
+from .services.auth_service import AuthService
+from .models import User, Favorite, Question, TestRecord
 from dotenv import load_dotenv
 import json
 import random
 import os
-
-# 統一從 .models 導入所有需要的模型
-from .models import User, Question, Favorite, TestRecord, WrongQuestion, Explanation, GptLog, Feedback, WeakTopic
-
-# 導入 services (避免重複導入)
-from .services.gpt_service import GPTExplanationService
-from .services.openai_client import OpenAIClient
-from .services.auth_service import AuthService
-
-# ⬇ 實例化 Repositories (放在檔案頂部，大家共用) ⬇
-user_repo = UserRepository()
-wrong_question_repo = WrongQuestionRepository()
-weak_topic_repo = WeakTopicRepository()
-test_record_repo = TestRecordRepository()
 
 
 load_dotenv()  # 讀取 .env 檔案
@@ -38,7 +20,7 @@ auth_service = AuthService()
 def home(request):
     user_id = request.session.get('user_id')
     if not user_id:
-        return redirect('core:login')
+        return redirect('login')
 
     explanation = None
     if request.method == 'POST':
@@ -53,10 +35,21 @@ def home(request):
     return render(request, 'home.html', {'explanation': explanation})
 
 
+def register_view(request):
+    message = ""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        success, message = auth_service.register(username, password)
+        if success:
+            return redirect('login')  # 註冊成功就跳回登入頁
+    return render(request, 'register.html', {'message': message})
+
+
 def login_view(request):
     user_id = request.session.get('user_id')
     if user_id:
-        return redirect('core:dashboard') 
+        return redirect('dashboard') 
 
     message = ""
     if request.method == 'POST':
@@ -64,19 +57,19 @@ def login_view(request):
         password = request.POST.get('password')
         success, message = auth_service.login(request, username, password)
         if success:
-            return redirect('core:dashboard')  # 登入成功導向主頁
+            return redirect('dashboard')  # 登入成功導向主頁
     return render(request, 'login.html', {'message': message})
 
 
 def logout_view(request):
     auth_service.logout(request)
-    return redirect('core:login')  # 登出後導回首頁登入
+    return redirect('login')  # 登出後導回首頁登入
 
 
 def dashboard_view(request):
     user_id = request.session.get('user_id')
     if not user_id:
-        return redirect('core:login')
+        return redirect('login')
 
     return render(request, 'dashboard.html')
 
@@ -84,7 +77,7 @@ def dashboard_view(request):
 def start_test_view(request):
     user_id = request.session.get('user_id')
     if not user_id:
-        return redirect('core:login')
+        return redirect('login')
 
     if request.method == 'POST':
         # 清除舊的測驗紀錄，避免影響正確率與錯題計算
@@ -119,7 +112,7 @@ def start_test_view(request):
         request.session['test_questions'] = [q.id for q in selected]
         request.session['answers'] = {}
 
-        return redirect('core:test_question', question_index=0)
+        return redirect('test_question', question_index=0)
 
     return render(request, 'start_test.html')
 
@@ -127,7 +120,7 @@ def start_test_view(request):
 def test_question_view(request, question_index):
     config = request.session.get('test_config')
     if not config:
-        return redirect('core:start_test')
+        return redirect('start_test')
 
     if 'test_questions' not in request.session:
         topic = config['topic']
@@ -139,7 +132,7 @@ def test_question_view(request, question_index):
 
     question_ids = request.session['test_questions']
     if question_index >= len(question_ids):
-        return redirect('core:dashboard')
+        return redirect('dashboard')
 
     selected_answer = None
     if request.method == 'POST':
@@ -174,11 +167,11 @@ def test_question_view(request, question_index):
 def test_result_view(request):
     user_id = request.session.get('user_id')
     if not user_id:
-        return redirect('core:login')
+        return redirect('login')
 
     test_result_id = request.session.get('test_result_id')
     if not test_result_id:
-        return redirect('core:start_test')
+        return redirect('start_test')
 
     records = TestRecord.objects.filter(user_id=user_id, test_result_id=test_result_id)
 
@@ -254,26 +247,15 @@ def gpt_detail_view(request):
 
 
 
-def register_view(request):
-    message = ""
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        success, message = auth_service.register(username, password)
-        if success:
-            return redirect('core:login')  # 註冊成功就跳回登入頁
-    return render(request, 'register.html', {'message': message})
-
-
 def logout_view(request):
     auth_service.logout(request)
-    return redirect('core:login')
+    return redirect('login')
 
 
 def user_management_view(request):
     user_id = request.session.get('user_id')
     if not user_id:
-        return redirect('core:login')
+        return redirect('login')
 
     current_user = User.objects.get(id=user_id)
     if current_user.role != 'admin':
@@ -285,13 +267,13 @@ def user_management_view(request):
 
         if str(current_user.id) == target_id:
             messages.error(request, "無法修改自己的權限。")
-            return redirect('core:user_management')
+            return redirect('user_management')
 
         target_user = User.objects.get(id=target_id)
         target_user.role = new_role
         target_user.save()
         messages.success(request, f"使用者 {target_user.username} 已更新為 {new_role}。")
-        return redirect('core:user_management')
+        return redirect('user_management')
 
     users = User.objects.all()
     return render(request, 'user_management.html', {'users': users})
@@ -342,126 +324,21 @@ def toggle_star_view(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'invalid method'}, status=405)
+    
+
+@login_required
+def update_note_view(request, fav_id):
+    if request.method == 'POST':
+        user_id = request.session.get('user_id')
+        favorite = get_object_or_404(Favorite, id=fav_id, user_id=user_id)
+        note_text = request.POST.get('note', '')
+        favorite.note = note_text
+        favorite.save()
+        return redirect('wrong_questions')
 
 
+@login_required
 def wrong_questions_view(request):
     user_id = request.session.get('user_id')
-    if not user_id:
-        return redirect('core:login')
-
-    current_user_instance = user_repo.get_user_by_id(user_id) # <--- 使用 UserRepository
-    if not current_user_instance:
-        request.session.pop('user_id', None) 
-        return redirect('core:login')
-
-    selected_topic = request.GET.get('topic', None)
-
-    # 使用 WrongQuestionRepository 的方法來獲取錯題列表
-    wrong_list = wrong_question_repo.get_unconfirmed_by_user_and_topic(
-        user=current_user_instance, 
-        topic=selected_topic
-    )
-
-    # 使用 WrongQuestionRepository 的方法來獲取可用主題
-    available_topics = wrong_question_repo.get_distinct_topics_for_unconfirmed_by_user(
-        user=current_user_instance
-    )
-
-    context = {
-        'wrong_questions': wrong_list,
-        'available_topics': available_topics,
-        'current_topic': selected_topic if selected_topic else 'all'
-    }
-    return render(request, 'wrong_questions.html', context)
-    
-
-def diagnose_weakness_view(request):
-    user_id = request.session.get('user_id')
-    if not user_id: # 確保檢查 user_id 是否存在
-        return redirect('core:login')
-
-    current_user = user_repo.get_user_by_id(user_id) # <--- 1. 使用 UserRepository
-    if not current_user:
-        request.session.pop('user_id', None)
-        return redirect('core:login')
-
-    analysis_result = {
-        "weak_topics": [], 
-        "summary": "點擊「開始進行弱點分析」按鈕來查看您的 AI 診斷報告。"
-    }
-    
-    if request.method == 'POST':
-        # 2. 使用 WrongQuestionRepository 獲取錯題樣本
-        #    sample_count 的邏輯可以封裝在 Repository 方法內部，或者在這裡計算好再傳入
-        all_user_wrong_questions_count = wrong_question_repo.get_unconfirmed_by_user_and_topic(user=current_user).count()
-        sample_count = all_user_wrong_questions_count // 2
-        if sample_count == 0 and all_user_wrong_questions_count > 0:
-            sample_count = 1
-        # (可以進一步調整 sample_count 的邏輯，例如設定最小取樣數)
-            
-        wrong_questions_for_analysis = wrong_question_repo.get_sample_for_weakness_analysis(current_user, sample_count) # <--- 2. 使用 Repository 方法
-
-        if wrong_questions_for_analysis:
-            data_for_gpt = []
-            for wq_object in wrong_questions_for_analysis: # wq_object 現在是 WrongQuestion 的實例
-                data_for_gpt.append({
-                    'question_obj': wq_object.question, # 假設 get_sample_for_weakness_analysis 回傳的是 WrongQuestion 實例列表
-                })
-
-            if os.getenv("OPENAI_API_KEY"):
-                client = OpenAIClient(api_key=os.getenv("OPENAI_API_KEY"))
-                # 假設 GPTExplanationService 已經在檔案頂部被實例化為 gpt_service
-                # 如果不是，需要在这里實例化 gpt_service = GPTExplanationService(gpt_client=client)
-                # 目前的寫法是在頂部有 auth_service = AuthService()，但 gpt_service 可能需要在函式內或頂部實例化
-                # 為了與現有 gpt_detail_view 邏輯一致，我們在需要時才實例化
-                gpt_service = GPTExplanationService(gpt_client=client) 
-                
-                predefined_topics = None 
-                current_analysis_from_service = gpt_service.analyze_weaknesses(data_for_gpt, predefined_weak_topics=predefined_topics)
-                print(f"Analysis Result from Service: {current_analysis_from_service}") 
-                
-                analysis_result["summary"] = current_analysis_from_service.get("summary", "AI分析未能提供有效的文字摘要。")
-                analysis_result["weak_topics"] = current_analysis_from_service.get("weak_topics", [])
-
-                if analysis_result["weak_topics"]:
-                    for topic_name in analysis_result["weak_topics"]:
-                        if topic_name: 
-                            # 3. 使用 WeakTopicRepository 儲存弱點主題
-                            weak_topic_repo.update_or_create_weak_topic(current_user, topic_name) # <--- 3. 使用 Repository 方法
-                    print(f"Saved/Updated WeakTopics for user {current_user.username}")
-            else:
-                analysis_result["summary"] = "OpenAI API 金鑰未設定，無法進行 AI 分析。"
-        else:
-            analysis_result["summary"] = "沒有足夠的錯題進行分析（目前選取0題）。"
-    
-    # 4. 使用 WeakTopicRepository 獲取已記錄的弱點主題
-    existing_weak_topics = weak_topic_repo.get_weak_topics_for_user(current_user) # <--- 4. 使用 Repository 方法
-    print(f"Existing Weak Topics from DB for user {current_user.username}: {list(existing_weak_topics.values_list('topic', flat=True))}")
-
-    context = {
-        'analysis_summary': analysis_result.get("summary"),
-        'existing_weak_topics': existing_weak_topics, 
-        'page_title': "AI 弱點診斷"
-    }
-    # 確保模板名稱是實際的檔案名，之前確認是 'weakness_analysis_result.html'
-    return render(request, 'weakness_analysis_result.html', context) 
-
-
-def grade_history_view(request):
-    user_id = request.session.get('user_id')
-    if not user_id:
-        return redirect('core:login')
-
-    current_user = user_repo.get_user_by_id(user_id)
-    if not current_user:
-        request.session.pop('user_id', None)
-        return redirect('core:login')
-
-    # 透過 Repository 獲取測驗歷史摘要
-    test_history_details = test_record_repo.get_recent_test_session_summaries(user=current_user, limit=10)
-
-    context = {
-        'test_history': test_history_details,
-        'page_title': "測驗歷史記錄"
-    }
-    return render(request, 'grade_history.html', context)
+    favorites = Favorite.objects.filter(user_id=user_id)
+    return render(request, 'wrong_questions.html', {'favorites': favorites})

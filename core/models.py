@@ -1,7 +1,4 @@
 from django.db import models
-from django.utils import timezone
-
-
 
 class User(models.Model):
     ROLE_CHOICES = (
@@ -41,15 +38,6 @@ class Question(models.Model):
         return self.content[:30]
     
 
-class Favorite(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    note = models.TextField(blank=True)  # 📝 可加筆記（選填）
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('user', 'question')  # 每人每題只能收藏一次
-
 
 class TestRecord(models.Model):
     test_result_id = models.CharField(max_length=64) 
@@ -63,42 +51,17 @@ class TestRecord(models.Model):
     def __str__(self):
         return f"{self.user.username} - Q{self.question.id} - Ans: {self.selected_option}"
 
+    # 自行封裝方法：判斷是否已作答
     @classmethod
-    def save_answer(cls, user_id, question, selected_option, test_result_id):
-        # --- 在方法內部導入和實例化 Repositories ---
-        from .repositories import UserRepository, WrongQuestionRepository # <--- 改到這裡導入
-        user_repo = UserRepository()
-        wrong_question_repo = WrongQuestionRepository()
-        # --- 導入和實例化結束 ---
-
+    def save_answer(cls, user_id, question, selected_option, test_result_id):       
         if not cls.has_answered(user_id, question.id, test_result_id):
-            is_correct_val = (selected_option == question.answer)
-
-            user_instance_for_logic = user_repo.get_user_by_id(user_id) # 使用方法內實例化的 repo
-
-            if not user_instance_for_logic:
-                print(f"ERROR: User with id {user_id} not found in TestRecord.save_answer") # 加上 log
-                return 
-
-            cls.objects.create( 
-                user=user_instance_for_logic, 
+            cls.objects.create(
+                user_id=user_id,
                 question=question,
                 selected_option=selected_option,
-                is_correct=is_correct_val, 
+                is_correct=(selected_option == question.answer),
                 test_result_id=test_result_id
             )
-
-            if not is_correct_val:
-                wq, created = wrong_question_repo.get_or_create( # 使用方法內實例化的 repo
-                    user=user_instance_for_logic,
-                    question=question,
-                    defaults={'confirmed': False, 'note': ''}
-                )
-
-                if not created:
-                    wq.confirmed = False
-                    wrong_question_repo.update_wrong_question_fields(wq, fields_to_update=['confirmed'])
-
 
     @classmethod
     def has_answered(cls, user_id, question_id, test_result_id):
@@ -153,23 +116,14 @@ class Feedback(models.Model):
         return f"{self.user.username} 對 Q{self.question.id} 的回饋"
 
 
-class WrongQuestion(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE) 
-    question = models.ForeignKey(Question, on_delete=models.CASCADE) 
-    confirmed = models.BooleanField(default=False) # 原有的：是否已在錯題本中確認/複習
-    last_wrong_time = models.DateTimeField(auto_now=True) # 原有的：記錄最近一次答錯時間
-    note = models.TextField(blank=True, null=True) # 原有的：筆記
-
-    # --- 要求新增的欄位 ---
-    is_fixed = models.BooleanField(default=False)  # 新增：是否已在「錯題挑戰」中修正此題
-    created_dt = models.DateTimeField(auto_now_add=True) # 新增：這筆錯題記錄的建立時間
-    fixed_dt = models.DateTimeField(null=True, blank=True)  # 新增：標記為已修正的時間 (可為空)
-    # --- 新增欄位結束 ---
+class Favorite(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    note = models.TextField(blank=True)  # S10 筆記內容
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'question')
+        unique_together = ('user', 'question')  # 每人每題一筆錯題記錄
 
     def __str__(self):
-        return f"{self.user.username} - {self.question.content[:50]}..."
-    
-    
+        return f"{self.user.username} 的錯題 Q{self.question.id}"
