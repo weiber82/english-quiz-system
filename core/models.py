@@ -123,3 +123,17 @@ class Feedback(models.Model):
 
     def __str__(self):
         return f"{self.user.username} 對 Q{self.question.id} 的回饋"
+
+
+class WrongQuestion(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    confirmed = models.BooleanField(default=False)
+    last_wrong_time = models.DateTimeField(auto_now=True)
+    note = models.TextField(blank=True)  # ✅ S10 功能的筆記欄位
+
+    class Meta:
+        unique_together = ('user', 'question')  # 每人每題一筆錯題記錄
+
+    def __str__(self):
+        return f"{self.user.username} 的錯題 Q{self.question.id}"

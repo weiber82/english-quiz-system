@@ -1,0 +1,23 @@
+{% extends "home.html" %}
+
+{% block content %}
+<h2>錯題本</h2>
+
+{% if wrong_questions %}
+  {% for item in wrong_questions %}
+    <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+      <p><strong>題目：</strong> {{ item.question.content }}</p>
+
+      <form method="POST" action="{% url 'update_note' item.id %}">
+        {% csrf_token %}
+        <label>筆記：</label><br>
+        <textarea name="note" rows="3" cols="60">{{ item.note }}</textarea><br>
+        <button type="submit">儲存筆記</button>
+      </form>
+    </div>
+  {% endfor %}
+{% else %}
+  <p>目前尚無錯題。</p>
+{% endif %}
+
+{% endblock %}

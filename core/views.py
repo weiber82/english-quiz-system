@@ -12,6 +12,9 @@ from core.models import Favorite, Question, User, TestRecord
 import json
 import random
 import os
+from django.shortcuts import get_object_or_404, redirect
+from .models import WrongQuestion
+from django.contrib.auth.decorators import login_required
 
 load_dotenv()  # 讀取 .env 檔案
 
@@ -325,3 +328,17 @@ def toggle_star_view(request):
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'invalid method'}, status=405)
     
+
+@login_required
+def update_note_view(request, wrong_id):
+    if request.method == 'POST':
+        wrong_question = get_object_or_404(WrongQuestion, id=wrong_id, user=request.user)
+        note_text = request.POST.get('note', '')
+        wrong_question.note = note_text
+        wrong_question.save()
+        return redirect('wrong_questions')
+    
+@login_required
+def wrong_questions_view(request):
+    wrong_questions = WrongQuestion.objects.filter(user=request.user)
+    return render(request, 'wrong_questions.html', {'wrong_questions': wrong_questions})
