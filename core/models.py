@@ -127,3 +127,32 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f"{self.user.username} 的錯題 Q{self.question.id}"
+
+    @classmethod
+    def get_user_favorites(cls, user_id):
+        """取得指定使用者所有收藏紀錄"""
+        return cls.objects.filter(user_id=user_id)
+
+    @classmethod
+    def is_starred(cls, user_id, question_id):
+        """判斷該使用者是否已收藏某題"""
+        return cls.objects.filter(user_id=user_id, question_id=question_id).exists()
+
+    @classmethod
+    def toggle_star(cls, user_id, question_id):
+        """若已收藏則取消，否則新增"""
+        favorite, created = cls.objects.get_or_create(user_id=user_id, question_id=question_id)
+        if not created:
+            favorite.delete()
+            return False
+        return True
+
+    @classmethod
+    def update_note(cls, fav_id, user_id, note_text):
+        """更新筆記內容"""
+        try:
+            favorite = cls.objects.get(id=fav_id, user_id=user_id)
+            favorite.note = note_text
+            favorite.save()
+        except cls.DoesNotExist:
+            pass

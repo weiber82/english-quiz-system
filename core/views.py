@@ -330,15 +330,14 @@ def toggle_star_view(request):
 def update_note_view(request, fav_id):
     if request.method == 'POST':
         user_id = request.session.get('user_id')
-        favorite = get_object_or_404(Favorite, id=fav_id, user_id=user_id)
         note_text = request.POST.get('note', '')
-        favorite.note = note_text
-        favorite.save()
+        Favorite.update_note(fav_id, user_id, note_text)  # 封裝在 model 內
         return redirect('wrong_questions')
 
 
 @login_required
 def wrong_questions_view(request):
     user_id = request.session.get('user_id')
-    favorites = Favorite.objects.filter(user_id=user_id)
+    favorites = Favorite.get_user_favorites(user_id)  # 呼叫封裝好的方法
     return render(request, 'wrong_questions.html', {'favorites': favorites})
+
