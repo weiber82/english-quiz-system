@@ -1,17 +1,17 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 from .services.gpt_service import GPTExplanationService
 from .services.openai_client import OpenAIClient
 from .services.auth_service import AuthService
-from .models import User
+from .models import User, Favorite, Question, TestRecord
 from dotenv import load_dotenv
-from core.models import Favorite, Question, User, TestRecord
 import json
 import random
 import os
+
 
 load_dotenv()  # 讀取 .env 檔案
 
@@ -325,3 +325,20 @@ def toggle_star_view(request):
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'invalid method'}, status=405)
     
+
+@login_required
+def update_note_view(request, fav_id):
+    if request.method == 'POST':
+        user_id = request.session.get('user_id')
+        favorite = get_object_or_404(Favorite, id=fav_id, user_id=user_id)
+        note_text = request.POST.get('note', '')
+        favorite.note = note_text
+        favorite.save()
+        return redirect('wrong_questions')
+
+
+@login_required
+def wrong_questions_view(request):
+    user_id = request.session.get('user_id')
+    favorites = Favorite.objects.filter(user_id=user_id)
+    return render(request, 'wrong_questions.html', {'favorites': favorites})

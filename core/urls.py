@@ -18,4 +18,6 @@ urlpatterns = [
     path('gpt/', views.gpt_detail_view, name='gpt_detail'),
     path('gpt/manual/', views.home, name='gpt_manual'),
     path('api/toggle-star/', views.toggle_star_view, name='toggle_star'),
+    path('wrong-note/<int:fav_id>/', views.update_note_view, name='update_note'),
+    path('wrong-questions/', views.wrong_questions_view, name='wrong_questions'),
 ]

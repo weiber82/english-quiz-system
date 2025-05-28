@@ -38,15 +38,6 @@ class Question(models.Model):
         return self.content[:30]
     
 
-class Favorite(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    note = models.TextField(blank=True)  # 可加筆記（選填）
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('user', 'question')  # 每人每題只能收藏一次
-
 
 class TestRecord(models.Model):
     test_result_id = models.CharField(max_length=64) 
@@ -123,3 +114,16 @@ class Feedback(models.Model):
 
     def __str__(self):
         return f"{self.user.username} 對 Q{self.question.id} 的回饋"
+
+
+class Favorite(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    note = models.TextField(blank=True)  # S10 筆記內容
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'question')  # 每人每題一筆錯題記錄
+
+    def __str__(self):
+        return f"{self.user.username} 的錯題 Q{self.question.id}"
