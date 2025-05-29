@@ -2,6 +2,7 @@
 from .models import User, WrongQuestion, Question, WeakTopic, TestRecord
 from django.utils import timezone
 from django.db.models import Min, Count
+import random
 
 class UserRepository:
     def get_user_by_id(self, user_id):
